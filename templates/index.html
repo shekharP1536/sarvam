@@ -314,6 +314,49 @@ function togglePreview(idx) {
     if (el) el.classList.toggle('hidden');
 }
 
+async function summarizeExtractedText(idx) {
+    const result = conversionResults[idx];
+    if (!result || !result.success) return;
+    
+    const text = typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2);
+    const container = document.getElementById(`summary-container-${idx}`);
+    
+    if (!container) return;
+    
+    // Show loading state
+    container.classList.remove('hidden');
+    container.innerHTML = `<div class="bg-indigo-50 text-indigo-700 rounded-lg px-4 py-3 text-sm font-medium">
+        <span class="spinner"></span> Generating summary from extracted text...
+    </div>`;
+    
+    try {
+        const resp = await fetch('/api/summarize-text', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, max_tokens: 500, temperature: 0.7 })
+        });
+        
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.error || 'Summarization failed');
+        }
+        
+        const data = await resp.json();
+        container.innerHTML = `<div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div class="flex items-center gap-2 font-semibold text-purple-800 mb-2">
+                <span>📝</span>
+                <span>AI Summary</span>
+            </div>
+            <div class="text-sm text-gray-800 leading-relaxed">${escapeHtml(data.summary)}</div>
+            <div class="text-xs text-gray-500 mt-2">Model: ${data.metadata.model} • Tokens: ${data.metadata.tokens_used.total}</div>
+        </div>`;
+    } catch (err) {
+        container.innerHTML = `<div class="bg-red-50 text-red-700 rounded-lg px-4 py-3 text-sm font-medium">
+            ❌ Error: ${escapeHtml(err.message)}
+        </div>`;
+    }
+}
+
 function escapeHtml(str) {
     const d = document.createElement('div');
     d.textContent = str;
